@@ -1,6 +1,6 @@
 using Azure.Data.Tables;
 
-namespace EasySMS.API.Azure.Services.TableStorage
+namespace DMIX.API.Azure.Services.TableStorage
 {
     public static class ITableServiceClientExtensions
     {

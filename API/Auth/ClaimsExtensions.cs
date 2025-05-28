@@ -1,7 +1,7 @@
-using EasySMS.API.Common.Models;
+using DMIX.API.Common.Models;
 using Newtonsoft.Json;
 
-namespace EasySMS.API.Auth
+namespace DMIX.API.Auth
 {
     public static class ClaimsExtensions
     {

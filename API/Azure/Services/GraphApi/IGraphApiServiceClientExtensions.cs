@@ -1,6 +1,6 @@
 using Microsoft.Graph;
 
-namespace EasySMS.API.Azure.Services.GraphApi
+namespace DMIX.API.Azure.Services.GraphApi
 {
     public static class IGraphApiServiceClientExtensions
     {

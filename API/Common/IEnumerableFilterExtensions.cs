@@ -1,6 +1,6 @@
-using EasySMS.API.Common.Models;
+using DMIX.API.Common.Models;
 
-namespace EasySMS.API.Common
+namespace DMIX.API.Common
 {
     public static class IEnumerableFilterExtensions
     {

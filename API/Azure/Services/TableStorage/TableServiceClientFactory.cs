@@ -1,7 +1,7 @@
 using Azure.Data.Tables;
 using Microsoft.Extensions.Options;
 
-namespace EasySMS.API.Azure.Services.TableStorage
+namespace DMIX.API.Azure.Services.TableStorage
 {
     public record TableServiceClientSettings
     {

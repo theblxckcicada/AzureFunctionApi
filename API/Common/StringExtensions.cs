@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace EasySMS.API.Common
+namespace DMIX.API.Common
 {
     public static class StringExtensions
     {

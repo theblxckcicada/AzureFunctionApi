@@ -1,50 +1,59 @@
-using EasySMS.API.Auth;
-using EasySMS.API.Azure.Services.BlobStorage;
-using EasySMS.API.Azure.Services.ConfigurationManager;
-using EasySMS.API.Azure.Services.GraphApi;
-using EasySMS.API.Azure.Services.ServiceBus;
-using EasySMS.API.Azure.Services.TableStorage;
-using EasySMS.API.Common.Models;
-using EasySMS.API.Functions.RequestValidation;
+using AnimalKingdom.API.DependencyInjection;
+using DMIX.API.Auth;
+using DMIX.API.Azure.Models;
+using DMIX.API.Azure.Services.BlobStorage;
+using DMIX.API.Azure.Services.ConfigurationManager;
+using DMIX.API.Azure.Services.GraphApi;
+using DMIX.API.Azure.Services.ServiceBus;
+using DMIX.API.Azure.Services.TableStorage;
+using DMIX.API.Common.Models;
+using DMIX.API.Handlers;
+using DMIX.API.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using System;
 
-namespace EasySMS.API.DependencyInjection
+namespace DMIX.API.DependencyInjection
 {
     public static class IServiceCollectionExtensions
     {
         public static IServiceCollection AddApiServices(this IServiceCollection services)
         {
-            _ = services
-                .AddSingleton(TimeProvider.System)
-                .AddScoped<JsonWebTokenHandler>()
-                .AddScoped<IHeaderHandler, HeaderHandler>()
-                .AddGraphApiService()
-                .AddBlobService()
-                .AddTableService()
-                .AddASBService()
-                .AddOpenIdConnectConfiguration()
-                .AddAuthorizer()
- 
-                .AddSingleton<HttpClient>()
-          
-                .AddScoped<IConfigurationManagerService, ConfigurationManagerService>();
+            // Core services
+            services.AddSingleton(TimeProvider.System);
+            services.AddScoped<JsonWebTokenHandler>();
+            services.AddScoped<IHeaderHandler, HeaderHandler>();
 
-            _ = services
-                .AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>())
- 
-                .AddSingleton<IEntityTypeProvider>(
-                    new EntityTypeProvider(
-                        EntityTypeProvider.GetEntityTypesInAssemblyContaining<Program>()
-                    )
-                );
+            // Azure/External Services
+            services.AddGraphApiService()
+                    .AddBlobService()
+                    .AddStorageService()
+                    .AddASBService();
+
+            // Auth and Config
+            services.AddOpenIdConnectConfiguration()
+                    .AddAuthorizer();
+
+            // Replace raw HttpClient registration with factory
+            services.AddHttpClient();
+
+            // App-specific services
+            services.AddScoped<IConfigurationManagerService, ConfigurationManagerService>();
+
+            // MediatR (make sure the right assemblies are used)
+            services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
+
+            // Register entity handlers (if not already done in AddStorageService)
+            services.AddEntityHandlers();
+            // services.AddStorageEntityHandlers(); // Consider removing if redundant
 
             return services;
         }
+
 
 
         public static IServiceCollection AddBlobService(this IServiceCollection services)
@@ -88,7 +97,7 @@ namespace EasySMS.API.DependencyInjection
             return services.AddScoped<IGraphApiService, GraphApiService>();
         }
 
-        public static IServiceCollection AddTableService(this IServiceCollection services)
+        public static IServiceCollection AddStorageService(this IServiceCollection services)
         {
             _ = services
                 .AddOptions<TableServiceClientSettings>()
@@ -105,7 +114,22 @@ namespace EasySMS.API.DependencyInjection
                 ).Build()
             );
 
-            return services.AddScoped<IAzureTableStorageService, AzureTableStorageService>();
+            services
+               .AddScoped(typeof(IStorageEntityHandler<,>), typeof(StorageEntityHandler<,>))
+                .AddScoped(typeof(StorageEntityHandler<,>))
+               .AddScoped(typeof(EntityHandler<,>))
+               .AddScoped(typeof(IAzureTableStorageService<,>), typeof(AzureTableStorageService<,>))
+               .AddScoped(typeof(AzureTableStorageService<,>));
+
+            services.Add(
+            new ServiceDescriptor(
+                    typeof(IEntityBaseKeyGenerator<Guid>),
+                typeof(GuidKeyGenerator),
+                ServiceLifetime.Scoped)
+            );
+            services.AddScoped(typeof(AppHeader));
+
+            return services;
         }
 
         public static IServiceCollection AddASBService(this IServiceCollection services)

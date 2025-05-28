@@ -1,4 +1,4 @@
-namespace EasySMS.API.Common
+namespace DMIX.API.Common
 {
     public class GenericEqualityComparer<T> : IEqualityComparer<T>
     {

@@ -1,16 +1,14 @@
-﻿namespace AnimalKingdom.API.Models;
+﻿namespace DMIX.API.Models;
 
 public class GuidKeyGenerator : IEntityBaseKeyGenerator<Guid>
 {
     public TModel Generate<TModel>(TModel model)
-        where TModel : IEntityBase<Guid>
+        where TModel : EntityBase<Guid>
     {
-        if (model == null)
-        {
-            throw new ArgumentNullException(nameof(model));
-        }
+        ArgumentNullException.ThrowIfNull(model);
 
-        model.Id = Guid.NewGuid();
+        model.RowKey = Guid.NewGuid().ToString();
         return model;
     }
+
 }

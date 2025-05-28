@@ -1,6 +1,6 @@
 using Azure.Data.Tables;
 
-namespace EasySMS.API.Azure.Models
+namespace DMIX.API.Azure.Models
 {
     public static class ITableEntityExtensions
     {

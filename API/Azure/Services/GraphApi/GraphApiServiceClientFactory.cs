@@ -2,7 +2,7 @@ using Azure.Identity;
 using Microsoft.Extensions.Options;
 using Microsoft.Graph;
 
-namespace EasySMS.API.Azure.Services.GraphApi
+namespace DMIX.API.Azure.Services.GraphApi
 {
     public record GraphApiServiceClientSettings
     {

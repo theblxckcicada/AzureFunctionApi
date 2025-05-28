@@ -1,7 +1,8 @@
 using System.Text.Json.Serialization;
-using EasySMS.API.Functions.Converters;
+using DMIX.API.Common;
+using DMIX.API.Models;
 
-namespace EasySMS.API.Azure.Models;
+namespace DMIX.API.Azure.Models;
 
 public enum OTPTemplate
 {
@@ -40,7 +41,7 @@ public enum Frequency
     Days
 }
 
-public record Account : EntityBase
+public record Account : EntityBase<Guid>
 {
     public string ParentRowKey
     {

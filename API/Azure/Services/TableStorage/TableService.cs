@@ -1,75 +1,47 @@
 using System.Reflection;
 using Azure;
 using Azure.Data.Tables;
-using EasySMS.API.Azure.Services.ConfigurationManager;
-using EasySMS.API.Common.Models;
-using EasySMS.API.Functions.Helpers;
-using Microsoft.AspNetCore.Http;
+using DMIX.API.Common.Models;
+using DMIX.API.Models;
 using Newtonsoft.Json;
 
-namespace EasySMS.API.Azure.Services.TableStorage
+namespace DMIX.API.Azure.Services.TableStorage
 {
-    public interface IAzureTableStorageService
+    public interface IAzureTableStorageService<TModel, TKey>
+        where TModel : EntityBase<TKey>
     {
-        Task<List<T>> GetAsync<T>(
-            string tableName,
-            List<Filter> filters,
-            Sort sort,
-            CancellationToken cancellationToken = default
-        );
-        Task<TableEntity> InsertAsync<TEntity>(
-            string tableName,
-            TEntity entity,
-            List<Filter> filters,
-            CancellationToken cancellationToken = default
-        )
-            where TEntity : class, ITableEntity, new();
-        Task<TableEntity> UpdateAsync<TEntity>(
-            string tableName,
-            TEntity entity,
-            List<Filter> filters,
-            CancellationToken cancellationToken = default
-        )
-            where TEntity : class, ITableEntity, new();
-        Task<TableEntity> DeleteAsync(
-            string tableName,
-            List<Filter> filters,
-            CancellationToken cancellationToken = default
-        );
-        Task<List<TEntity>> BatchFuncAsync<TEntity, U>(
-            string tableName,
-            List<TEntity> entities,
-            List<Filter> filters,
-            TableTransactionActionType type,
-            CancellationToken cancellationToken = default,
-            bool CreateRowKey = true
-        )
-            where TEntity : class, ITableEntity, new()
-            where U : class, ITableEntity, new();
 
-        // List<List<TableTransactionAction>> CreateBatches<TEntity>(List<TEntity> entities, List<Filter> filters, TableTransactionActionType type, int batchSize = 100, bool CreateRowKey = true)
-        //   where TEntity : class, ITableEntity, new();
-
-        Task SubmitBatchesAsync(
-            List<List<TableTransactionAction>> batches,
-            TableClient tableClient
-        );
-        public List<T> ConvertModel<T, U>(List<U> entities)
-            where T : class, ITableEntity, new()
-            where U : class, ITableEntity, new();
-        Task<List<T>> HandleSubItemsAsyncTransactionsAsync<T>(
-            List<T> entities,
+        Task<List<TModel>> GetAsync(
+            string tableName,
             List<Filter> filters,
-            KeyValuePair<string, (Type type, List<object> subItems)> item,
+            EntityQuery query,
             CancellationToken cancellationToken = default
-        )
-            where T : class, ITableEntity, new();
+        );
+        Task<TModel> InsertAsync(
+            string tableName,
+            TModel entity,
+            List<Filter> filters,
+            CancellationToken cancellationToken = default
+        );
+
+        Task<TModel> UpdateAsync(
+            string tableName,
+            TModel entity,
+            List<Filter> filters,
+            CancellationToken cancellationToken = default
+        );
+        Task<TModel> DeleteAsync(
+            string tableName,
+            List<Filter> filters,
+            CancellationToken cancellationToken = default
+        );
+
     }
 
-    public class AzureTableStorageService(
-        TableServiceClient serviceClient,
-        IConfigurationManagerService configurationManagerService
-    ) : IAzureTableStorageService
+    public class AzureTableStorageService<TModel, TKey>(
+        TableServiceClient serviceClient
+    ) : IAzureTableStorageService<TModel, TKey>
+        where TModel : EntityBase<TKey>
     {
         private readonly TableServiceClient serviceClient = serviceClient;
 
@@ -119,15 +91,15 @@ namespace EasySMS.API.Azure.Services.TableStorage
             return result;
         }
 
-        private static List<T> GetFilteredEntities<T>(
-            List<TableEntity> entities,
+        private static List<TModel> GetFilteredEntities(
+            List<TModel> entities,
             List<Filter> filter
         )
         {
-            var entity = JsonConvert.DeserializeObject<List<T>>(
+            var entity = JsonConvert.DeserializeObject<List<TModel>>(
                 JsonConvert.SerializeObject(entities)
             );
-            var properties = typeof(T).GetProperties(
+            var properties = typeof(TModel).GetProperties(
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
             );
 
@@ -216,42 +188,65 @@ namespace EasySMS.API.Azure.Services.TableStorage
             return entity;
         }
 
-        private static List<T> GetSortedEntities<T>(List<T> entities, Sort sort)
+        private static List<TModel> GetSortedEntities(List<TModel> entities, EntityQuery query)
         {
-            var property = typeof(T).GetProperty(sort.FilterValue);
-            entities = sort.SortDirection.Equals(
-                nameof(DataSort.asc),
-                StringComparison.OrdinalIgnoreCase
-            )
-                ? [.. entities.OrderBy(x => property.GetValue(x, null))]
-                : [.. entities.OrderByDescending(x => property.GetValue(x, null))];
+            if (!query.Query.Any())
+                return entities;
 
-            return entities;
+            IOrderedEnumerable<TModel>? sortedEntities = null;
+
+            foreach (var sort in query.Query)
+            {
+                if (string.IsNullOrWhiteSpace(sort.Sort))
+                    continue;
+
+                var property = typeof(TModel).GetProperty(sort.Sort);
+                if (property == null)
+                    continue;
+
+                bool ascending = sort.SortDirection?.Equals(nameof(DataSort.asc), StringComparison.OrdinalIgnoreCase) ?? true;
+
+                if (sortedEntities == null)
+                {
+                    sortedEntities = ascending
+                        ? entities.OrderBy(x => property.GetValue(x, null))
+                        : entities.OrderByDescending(x => property.GetValue(x, null));
+                }
+                else
+                {
+                    sortedEntities = ascending
+                        ? sortedEntities.ThenBy(x => property.GetValue(x, null))
+                        : sortedEntities.ThenByDescending(x => property.GetValue(x, null));
+                }
+            }
+
+            return sortedEntities?.ToList() ?? entities;
         }
 
-        private async Task<TableEntity> GetRowAsync<TEntity>(
+
+        private async Task<TModel> GetRowAsync(
             string tableName,
-            TEntity entity,
+            TModel entity,
             CancellationToken cancellationToken = default
         )
-            where TEntity : class, ITableEntity, new()
+
         {
             var serviceClient = await this.serviceClient.WithTableAsync(
                 tableName,
                 cancellationToken
             );
             var tableClient = serviceClient.GetTableClient(tableName);
-            return await tableClient.GetEntityAsync<TableEntity>(
+            return await tableClient.GetEntityAsync<TModel>(
                 entity.PartitionKey,
                 entity.RowKey,
                 cancellationToken: cancellationToken
             );
         }
 
-        public async Task<List<T>> GetAsync<T>(
+        public async Task<List<TModel>> GetAsync(
             string tableName,
             List<Filter> filters,
-            Sort sort,
+            EntityQuery query,
             CancellationToken cancellationToken = default
         )
         {
@@ -260,7 +255,7 @@ namespace EasySMS.API.Azure.Services.TableStorage
                 cancellationToken
             );
             var tableClient = serviceClient.GetTableClient(tableName);
-            List<TableEntity> results = [];
+            List<TModel> results = [];
 
             // If no RowKey provide, try to query
             var rowKey = GetFilterItem(
@@ -273,7 +268,7 @@ namespace EasySMS.API.Azure.Services.TableStorage
             )?.Value;
             if (!string.IsNullOrEmpty(rowKey) && !string.IsNullOrEmpty(partitionKey))
             {
-                var result = await tableClient.GetEntityAsync<TableEntity>(
+                var result = await tableClient.GetEntityAsync<TModel>(
                     GetFilterItem(
                         filters,
                         nameof(AzureTableStorageSystemProperty.PartitionKey)
@@ -289,7 +284,7 @@ namespace EasySMS.API.Azure.Services.TableStorage
                 // TODO: ADD maxPerPage and Select {Property columns}
                 var oDataQuery = GetODataQuery(filters);
 
-                var queryResultsFilter = tableClient.QueryAsync<TableEntity>(
+                var queryResultsFilter = tableClient.QueryAsync<TModel>(
                     filter: oDataQuery,
                     cancellationToken: cancellationToken
                 );
@@ -300,18 +295,18 @@ namespace EasySMS.API.Azure.Services.TableStorage
             }
 
             // Apply the filter query
-            var filteredResults = GetFilteredEntities<T>(results, filters);
-            var sortedEntities = GetSortedEntities(filteredResults, sort);
+            var filteredResults = GetFilteredEntities(results, filters);
+            var sortedEntities = GetSortedEntities(filteredResults, query);
             return sortedEntities;
         }
 
-        public async Task<TableEntity> InsertAsync<TEntity>(
+        public async Task<TModel> InsertAsync(
             string tableName,
-            TEntity entity,
+            TModel entity,
             List<Filter> filters,
             CancellationToken cancellationToken = default
         )
-            where TEntity : class, ITableEntity, new()
+
         {
             entity.PartitionKey = GetFilterItem(
                 filters,
@@ -325,20 +320,20 @@ namespace EasySMS.API.Azure.Services.TableStorage
             var tableClient = serviceClient.GetTableClient(tableName);
 
             _ = await tableClient.AddEntityAsync(entity, cancellationToken);
-            return await tableClient.GetEntityAsync<TableEntity>(
+            return await tableClient.GetEntityAsync<TModel>(
                 entity.PartitionKey,
                 entity.RowKey,
                 cancellationToken: cancellationToken
             );
         }
 
-        public async Task<TableEntity> UpdateAsync<TEntity>(
+        public async Task<TModel> UpdateAsync(
             string tableName,
-            TEntity entity,
+            TModel entity,
             List<Filter> filters,
             CancellationToken cancellationToken = default
         )
-            where TEntity : class, ITableEntity, new()
+
         {
             entity.PartitionKey = GetFilterItem(
                 filters,
@@ -364,14 +359,14 @@ namespace EasySMS.API.Azure.Services.TableStorage
                 tableEntity.ETag,
                 cancellationToken: cancellationToken
             );
-            return await tableClient.GetEntityAsync<TableEntity>(
+            return await tableClient.GetEntityAsync<TModel>(
                 entity.PartitionKey,
                 entity.RowKey,
                 cancellationToken: cancellationToken
             );
         }
 
-        public async Task<TableEntity> DeleteAsync(
+        public async Task<TModel> DeleteAsync(
             string tableName,
             List<Filter> filters,
             CancellationToken cancellationToken = default
@@ -391,7 +386,7 @@ namespace EasySMS.API.Azure.Services.TableStorage
                 cancellationToken
             );
             var tableClient = serviceClient.GetTableClient(tableName);
-            var tableEntity = await tableClient.GetEntityAsync<TableEntity>(
+            var tableEntity = await tableClient.GetEntityAsync<TModel>(
                 partitionKey,
                 rowKey,
                 cancellationToken: cancellationToken
@@ -403,326 +398,6 @@ namespace EasySMS.API.Azure.Services.TableStorage
                 cancellationToken: cancellationToken
             );
             return tableEntity;
-        }
-
-        public async Task<List<TEntity>> BatchFuncAsync<TEntity, U>(
-            string tableName,
-            List<TEntity> entities,
-            List<Filter> filters,
-            TableTransactionActionType type,
-            CancellationToken cancellationToken = default,
-            bool CreateRowKey = true
-        )
-            where TEntity : class, ITableEntity, new()
-            where U : class, ITableEntity, new()
-        {
-            var serviceClient = await this.serviceClient.WithTableAsync(
-                tableName,
-                cancellationToken
-            );
-            var tableClient = serviceClient.GetTableClient(tableName);
-
-            foreach (var entity in entities)
-            {
-                entity.PartitionKey = GetFilterItem(
-                    filters,
-                    nameof(AzureTableStorageSystemProperty.PartitionKey)
-                ).Value;
-                if (CreateRowKey)
-                {
-                    entity.RowKey = Guid.NewGuid().ToString();
-                }
-            }
-
-            // Get sub items
-            var subItems = Helper.AddSubEntities(entities);
-
-            //convert entities to those that have no lists
-            var convertedEntities = ConvertModel<U, TEntity>(entities);
-            convertedEntities = Helper.ConvertDateTimePropertiesToUtc(convertedEntities);
-
-            // submit batches
-            var batches = CreateBatches(
-                convertedEntities,
-                filters,
-                type,
-                100,
-                false
-            );
-            await SubmitBatchesAsync(batches, tableClient);
-
-            return await Task.FromResult(entities);
-        }
-
-        public async Task SubmitBatchesAsync(
-            List<List<TableTransactionAction>> batches,
-            TableClient tableClient
-        )
-        {
-            await Parallel.ForEachAsync(
-                batches,
-                async (batch, cancellationToken) =>
-                {
-                    _ = await tableClient.SubmitTransactionAsync(batch, cancellationToken);
-                }
-            );
-        }
-
-        public static List<List<TableTransactionAction>> CreateBatches<TEntity>(
-            List<TEntity> entities,
-            List<Filter> filters,
-            TableTransactionActionType type,
-            int batchSize = 100,
-            bool CreateRowKey = true
-        )
-            where TEntity : class, ITableEntity, new()
-        {
-            List<List<TableTransactionAction>> batches = [];
-            List<TableTransactionAction> currentBatch = [];
-
-            foreach (var entity in entities)
-            {
-                if (CreateRowKey)
-                {
-                    entity.RowKey = Guid.NewGuid().ToString();
-                }
-                // Create a sample TableTransactionAction object (replace with your actual object)
-                TableTransactionAction transactionAction = new(type, entity);
-                currentBatch.Add(transactionAction);
-
-                if (currentBatch.Count == batchSize)
-                {
-                    batches.Add(currentBatch);
-                    currentBatch = [];
-                }
-            }
-
-            // Add the remaining elements to the last batch
-            if (currentBatch.Count > 0)
-            {
-                batches.Add(currentBatch);
-            }
-
-            return batches;
-        }
-
-        private static List<T> GetSubItems<T>(
-            KeyValuePair<string, (Type type, List<object> subItems)> item
-        )
-            where T : class, ITableEntity, new()
-        {
-            List<T> entities = [];
-            foreach (var itemValue in item.Value.subItems)
-            {
-                if (itemValue is ITableEntity tableValue)
-                {
-                    entities.Add((T)tableValue);
-                }
-            }
-            return entities;
-        }
-
-        [Obsolete]
-        public async Task<List<T>> HandleSubItemsAsyncTransactionsAsync<T>(
-            List<T> entities,
-            List<Filter> filters,
-            KeyValuePair<string, (Type type, List<object> subItems)> item,
-            CancellationToken cancellationToken = default
-        )
-            where T : class, ITableEntity, new()
-        {
-            List<List<TableTransactionAction>> batches = [];
-
-            // get entities with row keys
-            var subWithRowKey = entities
-                .Where(entity =>
-                    !string.IsNullOrEmpty(entity.RowKey) && Helper.IsValidUUID(entity.RowKey)
-                )
-                .ToList();
-            var subWithoutRowKey = entities
-                .Where(entity =>
-                    string.IsNullOrEmpty(entity.RowKey) || !Helper.IsValidUUID(entity.RowKey)
-                )
-                .ToList();
-
-            subWithoutRowKey = Helper.ConvertDateTimePropertiesToUtc(subWithoutRowKey);
-            subWithRowKey = Helper.ConvertDateTimePropertiesToUtc(subWithRowKey);
-
-            var result = CreateBatches(
-                subWithoutRowKey,
-                filters,
-                TableTransactionActionType.Add,
-                100,
-                true
-            );
-            batches = [.. batches, .. result];
-
-            result = CreateBatches(
-                subWithRowKey,
-                filters,
-                TableTransactionActionType.UpsertReplace,
-                100,
-                false
-            );
-            batches = [.. batches, .. result];
-
-            // submit batches
-            var serviceClient = await this.serviceClient.WithTableAsync(
-                item.Key,
-                cancellationToken
-            );
-            var tableClient = serviceClient.GetTableClient(item.Key);
-            await SubmitBatchesAsync(batches, tableClient);
-            return entities;
-        }
-
-        public async Task<List<U>> AddAndUpdateSubItem<T, U>(
-            string tableName,
-            TableEntity entity,
-            List<U> subItems,
-            CancellationToken cancellationToken = default
-        )
-            where T : class
-            where U : class, ITableEntity, new()
-        {
-            List<TableEntity> items = [];
-            // For every item insert it into the table storage
-            List<Filter> itemFilters =
-            [
-                new Filter()
-                {
-                    KeyName = nameof(AzureTableStorageSystemProperty.PartitionKey),
-                    Value = entity.RowKey,
-                    IsKeyQueryable = true,
-                    IsComparatorSupported = true,
-                },
-            ];
-
-            foreach (var item in subItems)
-            {
-                if (item.RowKey is not null)
-                {
-                    List<Filter> updateItemFilters = [.. itemFilters.Take(itemFilters.Count)];
-                    updateItemFilters.Add(
-                        new Filter()
-                        {
-                            KeyName = nameof(AzureTableStorageSystemProperty.RowKey),
-                            Value = item.RowKey,
-                            IsKeyQueryable = true,
-                            IsComparatorSupported = true,
-                        }
-                    );
-                    var updatedSubEntity = await UpdateAsync(
-                        tableName,
-                        item,
-                        updateItemFilters,
-                        cancellationToken
-                    );
-                    items.Add(updatedSubEntity);
-                }
-                else
-                {
-                    var addedSubEntity = await InsertAsync(
-                        tableName,
-                        item,
-                        itemFilters,
-                        cancellationToken
-                    );
-                    items.Add(addedSubEntity);
-                }
-            }
-
-            return JsonConvert.DeserializeObject<List<U>>(JsonConvert.SerializeObject(items));
-        }
-
-        public async Task<List<T>> PopulateSubItems<T, U>(
-            string tableName,
-            List<T> entities,
-            string propertyName,
-            CancellationToken cancellationToken
-        )
-            where T : class, ITableEntity, new()
-            where U : class, ITableEntity, new()
-        {
-            Sort itemSort =
-                new()
-                {
-                    FilterValue = nameof(AzureTableStorageSystemProperty.RowKey),
-                    SortDirection = nameof(DataSort.asc),
-                    PageSize = 100,
-                    PageIndex = 0,
-                };
-            foreach (var entity in entities)
-            {
-                List<Filter> itemFilters =
-                [
-                    new Filter()
-                    {
-                        KeyName = nameof(AzureTableStorageSystemProperty.PartitionKey),
-                        Value = entity.RowKey,
-                        IsKeyQueryable = true,
-                        IsComparatorSupported = true,
-                    },
-                ];
-
-                // For every item insert it into the table storage
-                var propertyInfo = entity
-                    .GetType()
-                    .GetProperty(
-                        propertyName,
-                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase
-                    );
-
-                var productData = await GetAsync<U>(
-                    tableName,
-                    itemFilters,
-                    itemSort,
-                    cancellationToken
-                );
-                if (propertyInfo is not null && propertyInfo.CanWrite)
-                {
-                    propertyInfo.SetValue(entity, productData);
-                }
-                else
-                {
-                    throw new BadHttpRequestException(
-                        $"Could not retrieve {propertyName} entities"
-                    );
-                }
-            }
-
-            return entities;
-        }
-
-        public List<T> ConvertModel<T, U>(List<U> entities)
-            where T : class, ITableEntity, new()
-            where U : class, ITableEntity, new()
-        {
-            List<T> items = [];
-            foreach (var entity in entities)
-            {
-                T item = new();
-
-                // Get all properties of Businessitem and item
-                var uProperties = typeof(U).GetProperties();
-                var tProperties = typeof(T).GetProperties();
-
-                // Copy properties from Businessitem to item
-                foreach (var uProperty in uProperties)
-                {
-                    var tProperty = tProperties.FirstOrDefault(p =>
-                        p.Name == uProperty.Name
-                    );
-
-                    if (tProperty != null && tProperty.CanWrite)
-                    {
-                        var value = uProperty.GetValue(entity);
-                        tProperty.SetValue(item, value);
-                    }
-                }
-                items.Add(item);
-            }
-            return items;
         }
     }
 }

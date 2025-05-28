@@ -1,7 +1,6 @@
 using Azure.Messaging.ServiceBus;
-using EasySMS.API.Azure.Services.ServiceBus;
 
-namespace EasySMS.API.Azure.Services.ServiceBus
+namespace DMIX.API.Azure.Services.ServiceBus
 {
     public static class IASBServiceClientExtensions
     {

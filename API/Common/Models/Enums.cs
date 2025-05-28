@@ -1,4 +1,4 @@
-namespace EasySMS.API.Common.Models
+namespace DMIX.API.Common.Models
 {
     public enum Headers
     {
@@ -34,8 +34,8 @@ namespace EasySMS.API.Common.Models
         family_name,
         sub,
         city,
-        extension_ContactNumber,
-        extension_ReplyToEmail,
+        extension_Business,
+        extension_UserRole,
         emails,
         streetAddress,
         country,

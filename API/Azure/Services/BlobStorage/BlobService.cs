@@ -1,8 +1,8 @@
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using EasySMS.API.Common.Models;
+using DMIX.API.Common.Models;
 
-namespace EasySMS.API.Azure.Services.BlobStorage
+namespace DMIX.API.Azure.Services.BlobStorage
 {
     public interface IAzureBlobStorageService
     {

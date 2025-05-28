@@ -1,8 +1,8 @@
-using EasySMS.API.Azure.Models;
+using DMIX.API.Azure.Models;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 
-namespace EasySMS.API.Azure.Services.GraphApi
+namespace DMIX.API.Azure.Services.GraphApi
 {
     public interface IGraphApiService
     {
@@ -23,7 +23,7 @@ namespace EasySMS.API.Azure.Services.GraphApi
                             "GivenName",
                             "Surname",
                             "Id"
-                         
+
                         ];
                     }
                 );

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
-namespace EasySMS.API.Azure.Services.ConfigurationManager
+namespace DMIX.API.Azure.Services.ConfigurationManager
 {
     public record ConfigurationManagerServiceClientSettings
     {

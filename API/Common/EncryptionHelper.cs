@@ -1,6 +1,6 @@
 ﻿using System.Security.Cryptography;
 
-namespace EasySMS.API.Common
+namespace DMIX.API.Common
 {
     public static class EncryptionHelper
     {

@@ -1,7 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Newtonsoft.Json;
 
-namespace EasySMS.API.Azure.Services.ServiceBus
+namespace DMIX.API.Azure.Services.ServiceBus
 {
     public interface IASBService
     {

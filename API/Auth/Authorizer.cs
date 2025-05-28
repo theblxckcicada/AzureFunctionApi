@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Options;
 
-namespace EasySMS.API.Auth
+namespace DMIX.API.Auth
 {
     public record AuthSettings
     {

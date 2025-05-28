@@ -1,12 +1,12 @@
-using EasySMS.API.Azure.Models;
-using EasySMS.API.Azure.Services.ConfigurationManager;
-using EasySMS.API.Common.Models;
+using DMIX.API.Common.Models;
+using DMIX.API.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
 
-namespace EasySMS.API.Azure.Services.ConfigurationManager
+namespace DMIX.API.Azure.Services.ConfigurationManager
 {
     public interface IConfigurationManagerService
     {
@@ -86,6 +86,11 @@ namespace EasySMS.API.Azure.Services.ConfigurationManager
 
         public EasySMSUser GetEasySMSUser(IDictionary<string, object> claims)
         {
+            if (claims is null)
+            {
+
+                throw new BadHttpRequestException("Invalid Request");
+            }
             var firstName =
                 claims
                     .FirstOrDefault(claim =>
@@ -115,47 +120,22 @@ namespace EasySMS.API.Azure.Services.ConfigurationManager
                 _ => null
             };
 
-            var contactNumber =
+            var userRole =
                 claims
                     .FirstOrDefault(claim =>
                         claim.Key.Equals(
-                            nameof(AppAuthorization.extension_ContactNumber),
+                            nameof(AppAuthorization.extension_UserRole),
                             StringComparison.OrdinalIgnoreCase
                         )
                     )
                     .Value as string;
-            var streetAddress =
+
+
+            var business =
                 claims
                     .FirstOrDefault(claim =>
                         claim.Key.Equals(
-                            nameof(AppAuthorization.streetAddress),
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    .Value as string;
-            var country =
-                claims
-                    .FirstOrDefault(claim =>
-                        claim.Key.Equals(
-                            nameof(AppAuthorization.country),
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    .Value as string;
-            var city =
-                claims
-                    .FirstOrDefault(claim =>
-                        claim.Key.Equals(
-                            nameof(AppAuthorization.city),
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    .Value as string;
-            var replyToEmail =
-                claims
-                    .FirstOrDefault(claim =>
-                        claim.Key.Equals(
-                            nameof(AppAuthorization.extension_ReplyToEmail),
+                            nameof(AppAuthorization.extension_Business),
                             StringComparison.OrdinalIgnoreCase
                         )
                     )
@@ -172,17 +152,16 @@ namespace EasySMS.API.Azure.Services.ConfigurationManager
                     .FirstOrDefault()
                     .Value as string;
 
+            Enum.TryParse<UserRole>(userRole, true, out var UserRole);
             return new()
             {
                 FirstName = firstName!,
                 LastName = lastName!,
                 UserId = userId!,
                 EmailAddress = emailAddress?.FirstOrDefault()!,
-                ContactNumber = contactNumber!,
-                StreetAddress = streetAddress!,
-                Country = country!,
-                City = city!,
-                ReplyToEmail = replyToEmail!,
+                Business = business!,
+                UserRole = UserRole!,
+
             };
         }
     }

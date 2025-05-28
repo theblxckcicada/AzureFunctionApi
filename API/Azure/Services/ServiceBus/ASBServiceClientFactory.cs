@@ -1,7 +1,7 @@
 using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Options;
 
-namespace EasySMS.API.Azure.Services.ServiceBus
+namespace DMIX.API.Azure.Services.ServiceBus
 {
     public record ASBServiceClientSettings
     {

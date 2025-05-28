@@ -2,7 +2,7 @@ using Azure.Storage;
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Options;
 
-namespace EasySMS.API.Azure.Services.BlobStorage
+namespace DMIX.API.Azure.Services.BlobStorage
 {
     public record BlobServiceClientSettings
     {

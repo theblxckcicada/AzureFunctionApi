@@ -1,6 +1,6 @@
 using Azure.Storage.Blobs;
 
-namespace EasySMS.API.Azure.Services.BlobStorage
+namespace DMIX.API.Azure.Services.BlobStorage
 {
     public static class IBlobStorageServiceClientExtensions
     {

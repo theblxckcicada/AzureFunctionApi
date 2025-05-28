@@ -1,7 +1,7 @@
 using System.Net;
 using Microsoft.Azure.Functions.Worker.Http;
 
-namespace EasySMS.API.Http
+namespace DMIX.API.Http
 {
     public static class HttpRequestDataExtensions
     {

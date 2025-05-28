@@ -1,4 +1,4 @@
-namespace EasySMS.API.Common.Models
+namespace DMIX.API.Common.Models
 {
     public record Sort
     {
