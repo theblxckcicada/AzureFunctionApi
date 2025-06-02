@@ -1,5 +1,4 @@
-﻿using DMIX.API.Common.Models;
-using DMIX.API.Models;
+﻿using DMIX.API.Models;
 using MediatR;
 
 namespace DMIX.API.Handlers;
@@ -20,7 +19,7 @@ public record QueryEntitiesResponse<TModel>
     public int Total { get; init; } = 0;
 }
 
-public class QueryEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> filterHandler, AppHeader appHeader)
+public class QueryEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> filterHandler)
     : IRequestHandler<QueryEntitiesRequest<TModel, TKey>, QueryEntitiesResponse<TModel>>
     where TModel : EntityBase<TKey>
 {
@@ -37,7 +36,7 @@ public class QueryEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKe
         }
 
 
-        var entities = await storageEntityHandler.GetEntityAsync(appHeader, request.Query, cancellationToken: cancellationToken);
+        var entities = await storageEntityHandler.GetEntityAsync(request.Query, cancellationToken: cancellationToken);
 
 
         if (entities.Count <= 0)

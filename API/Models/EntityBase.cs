@@ -1,5 +1,6 @@
 using Azure;
 using Azure.Data.Tables;
+using System.ComponentModel;
 
 namespace DMIX.API.Models
 {
@@ -45,9 +46,11 @@ namespace DMIX.API.Models
         }
 
         // You can override this if TKey is not a string or Guid etc.
+
         protected virtual TKey ConvertFromString(string value)
         {
-            return (TKey)Convert.ChangeType(value, typeof(TKey));
+            var converter = TypeDescriptor.GetConverter(typeof(TKey));
+            return (TKey)converter.ConvertFromInvariantString(value);
         }
         public string UserId
         {

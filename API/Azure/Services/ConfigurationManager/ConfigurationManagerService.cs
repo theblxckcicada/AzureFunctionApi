@@ -1,4 +1,5 @@
 using DMIX.API.Common.Models;
+using DMIX.API.Helpers;
 using DMIX.API.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -86,10 +87,10 @@ namespace DMIX.API.Azure.Services.ConfigurationManager
 
         public EasySMSUser GetEasySMSUser(IDictionary<string, object> claims)
         {
-            if (claims is null)
+            if (claims is null || claims.Count <= 0)
             {
 
-                throw new BadHttpRequestException("Invalid Request");
+                throw new BadHttpRequestException(Error.InvalidAuthorizationToken(), StatusCodes.Status401Unauthorized);
             }
             var firstName =
                 claims

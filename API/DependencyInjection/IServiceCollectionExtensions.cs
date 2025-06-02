@@ -1,6 +1,5 @@
 using AnimalKingdom.API.DependencyInjection;
 using DMIX.API.Auth;
-using DMIX.API.Azure.Models;
 using DMIX.API.Azure.Services.BlobStorage;
 using DMIX.API.Azure.Services.ConfigurationManager;
 using DMIX.API.Azure.Services.GraphApi;
@@ -15,7 +14,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using System;
 
 namespace DMIX.API.DependencyInjection
 {
@@ -127,7 +125,6 @@ namespace DMIX.API.DependencyInjection
                 typeof(GuidKeyGenerator),
                 ServiceLifetime.Scoped)
             );
-            services.AddScoped(typeof(AppHeader));
 
             return services;
         }

@@ -1,5 +1,4 @@
-﻿using DMIX.API.Common.Models;
-using DMIX.API.Models;
+﻿using DMIX.API.Models;
 using MediatR;
 
 namespace DMIX.API.Handlers;
@@ -9,7 +8,7 @@ public record GetEntitiesRequest<TModel, TKey> : IRequest<IList<TModel>>
 {
 }
 
-public class GetEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKey> storageEntityHandler, AppHeader appHeader)
+public class GetEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKey> storageEntityHandler)
     : IRequestHandler<GetEntitiesRequest<TModel, TKey>, IList<TModel>>
     where TModel : EntityBase<TKey>
 {
@@ -19,7 +18,7 @@ public class GetEntitiesHandler<TModel, TKey>(StorageEntityHandler<TModel, TKey>
         CancellationToken cancellationToken
     )
     {
-        var entities = await storageEntityHandler.GetEntityAsync(appHeader, cancellationToken: cancellationToken);
+        var entities = await storageEntityHandler.GetEntityAsync(cancellationToken: cancellationToken);
         return [.. entities];
     }
 }

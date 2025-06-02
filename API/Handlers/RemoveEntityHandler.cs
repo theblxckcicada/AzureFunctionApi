@@ -1,5 +1,4 @@
-﻿using DMIX.API.Common.Models;
-using DMIX.API.Models;
+﻿using DMIX.API.Models;
 using FluentValidation.Results;
 using MediatR;
 
@@ -12,7 +11,7 @@ public record RemoveEntityRequest<TModel, TKey> : IRequest<CommandResponse<TMode
 }
 
 public class RemoveEntityHandler<TModel, TKey>(
-    StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> entityHandler, AppHeader appHeader
+    StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> entityHandler
 ) : IRequestHandler<RemoveEntityRequest<TModel, TKey>, CommandResponse<TModel>>
     where TModel : EntityBase<TKey>
     where TKey : IEquatable<TKey>
@@ -23,7 +22,7 @@ public class RemoveEntityHandler<TModel, TKey>(
         CancellationToken cancellationToken
     )
     {
-        var entity = (await storageEntityHandler.GetEntityAsync(appHeader,
+        var entity = (await storageEntityHandler.GetEntityAsync(
                entityHandler.GetEntityQuery(
                    entityHandler.GetRowKeyFilters(request.RowKey.ToString())),
                cancellationToken)).FirstOrDefault();

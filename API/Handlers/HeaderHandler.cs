@@ -8,30 +8,35 @@ namespace DMIX.API.Handlers
 {
     public interface IHeaderHandler
     {
-        Task<AppHeader> GetAppHeaderAsync(
+        Task<IDictionary<string, object>> GetClaims(
             HttpRequestData req,
             CancellationToken cancellationToken = default
         );
+        public IDictionary<string, object> Claims
+        {
+            get; set;
+        }
     }
 
     public class HeaderHandler(
         IConfigurationManagerService configurationManagerService
     ) : IHeaderHandler
     {
+        public IDictionary<string, object> Claims
+        {
+            get; set;
+        } = new Dictionary<string, object>();
         private static readonly List<string> httpTriggerMethods =
         [
             .. Enum.GetNames(typeof(HttpTriggerMethod)),
         ];
 
-        public async Task<AppHeader> GetAppHeaderAsync(
+        public async Task<IDictionary<string, object>> GetClaims(
             HttpRequestData req,
             CancellationToken cancellationToken = default
         )
         {
-            // var claims = await GetValidatedClaimsAsync(req.Headers, cancellationToken);
-            IDictionary<string, object>? claims = null;
-
-
+            var claims = await GetValidatedClaimsAsync(req.Headers, cancellationToken);
 
             if (!httpTriggerMethods.Contains(req.Method))
             {
@@ -39,16 +44,11 @@ namespace DMIX.API.Handlers
             }
 
 
-            return new AppHeader
-            {
-                Claims = claims,
-            };
+            return claims;
         }
 
         private async Task<IDictionary<string, object>> GetValidatedClaimsAsync(
             HttpHeadersCollection headers,
-            string apiKey,
-            string accountId,
             CancellationToken cancellationToken
         )
         {
@@ -58,23 +58,17 @@ namespace DMIX.API.Handlers
                 ? headers.GetValues(AuthHeaderName)?.FirstOrDefault()?.Trim()
                 : default;
 
-            //TODO: Uncomment this after implementing B2C
-            if (string.IsNullOrEmpty(authorizationTokenHeader))
-            {
-                if (string.IsNullOrEmpty(apiKey) && string.IsNullOrEmpty(accountId))
-                {
-                    throw new BadHttpRequestException(
-                        Error.AuthorizationTokenNotSupplied(),
-                        StatusCodes.Status401Unauthorized
-                    );
-                }
-                throw new BadHttpRequestException(Error.AuthorizationKeysNotSupplied());
-            }
+
 
             // Validate the Token
             var authToken = authorizationTokenHeader
                 ?.Replace(nameof(AppAuthorization.Bearer), string.Empty)
                 .Trim();
+
+            if (string.IsNullOrEmpty(authToken))
+            {
+                throw new BadHttpRequestException(Error.AuthorizationTokenNotSupplied());
+            }
 
             var isTokenValid = await configurationManagerService.ValidateJwtTokenAsync(
                 authToken,
@@ -84,11 +78,7 @@ namespace DMIX.API.Handlers
             //TODO: Uncomment this after implementing B2C
             if (!isTokenValid)
             {
-                if (string.IsNullOrEmpty(apiKey) && string.IsNullOrEmpty(accountId))
-                {
-                    throw new BadHttpRequestException(Error.InvalidAuthorizationToken());
-                }
-                throw new BadHttpRequestException(Error.AuthorizationKeysNotSupplied());
+                throw new BadHttpRequestException(Error.InvalidAuthorizationToken());
             }
 
             return (

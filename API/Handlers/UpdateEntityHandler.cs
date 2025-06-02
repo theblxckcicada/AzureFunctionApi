@@ -1,5 +1,4 @@
-﻿using DMIX.API.Common.Models;
-using DMIX.API.Models;
+﻿using DMIX.API.Models;
 using MediatR;
 
 namespace DMIX.API.Handlers;
@@ -12,7 +11,7 @@ public record UpdateEntityRequest<TModel, TKey> : IRequest<CommandResponse<TMode
 }
 
 public class UpdateEntityHandler<TModel, TKey>(
-        StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> entityHandler, AppHeader appHeader
+        StorageEntityHandler<TModel, TKey> storageEntityHandler, EntityHandler<TModel, TKey> entityHandler
 
 ) : IRequestHandler<UpdateEntityRequest<TModel, TKey>, CommandResponse<TModel>>
     where TModel : EntityBase<TKey>
@@ -26,7 +25,7 @@ public class UpdateEntityHandler<TModel, TKey>(
         var entity = request.Entity;
         if (!entity.RowKey.Equals(request.RowKey.ToString(), StringComparison.OrdinalIgnoreCase))
         {
-            entity = (await storageEntityHandler.GetEntityAsync(appHeader,
+            entity = (await storageEntityHandler.GetEntityAsync(
                 entityHandler.GetEntityQuery(
                     entityHandler.GetRowKeyFilters(request.RowKey.ToString())),
                 cancellationToken)).FirstOrDefault();
@@ -47,7 +46,7 @@ public class UpdateEntityHandler<TModel, TKey>(
             };
         }
 
-        var updated = await storageEntityHandler.UpdateEntityAsync(entity, appHeader, cancellationToken);
+        var updated = await storageEntityHandler.UpdateEntityAsync(entity, cancellationToken);
 
         return new CommandResponse<TModel> { Entities = [updated] };
     }

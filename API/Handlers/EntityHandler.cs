@@ -3,9 +3,6 @@ using DMIX.API.Azure.Services.ConfigurationManager;
 using DMIX.API.Common.Models;
 using DMIX.API.Models;
 using EasySMSV2.Shared.Azure.Models;
-using FluentValidation;
-using FluentValidation.Results;
-using Microsoft.AspNetCore.Http;
 
 namespace DMIX.API.Handlers
 {
@@ -24,24 +21,47 @@ namespace DMIX.API.Handlers
 
         List<Filter> EntityBaseFilters(TModel entity);
 
-        List<Filter> CreateFilters<T, K>(
-            AppHeader appHeader,
+        List<Filter> CreateFilters(
+
             string? rowKey = null,
             EntityQuery? query = null
-        ) where T : EntityBase<K>;
+        );
+
+
     }
 
 
 
     public class EntityHandler<TModel, TKey>(
             IConfigurationManagerService configurationManagerService,
-
-            IEntityBaseKeyGenerator<TKey> keyGenerator) : IEntityHandler<TModel, TKey>
+            IEntityBaseKeyGenerator<TKey> keyGenerator, IHeaderHandler headerHandler, TimeProvider timeProvider) : IEntityHandler<TModel, TKey>
           where TModel : EntityBase<TKey>
     {
         private readonly IConfigurationManagerService configurationManagerService = configurationManagerService;
 
         private readonly IEntityBaseKeyGenerator<TKey> keyGenerator = keyGenerator;
+        private readonly TimeProvider timeProvider = timeProvider;
+
+        public TModel UpdateModelDateTime(TModel entity)
+        {
+            var utcNow = timeProvider.GetUtcNow(); // returns DateTimeOffset
+            var user = configurationManagerService.GetEasySMSUser(headerHandler.Claims);
+
+            var utcDateTime = DateTime.SpecifyKind(utcNow.UtcDateTime, DateTimeKind.Utc);
+
+            if (string.IsNullOrEmpty(entity.CreatedBy))
+            {
+                entity.CreatedBy = $"{user.FirstName} {user.LastName}";
+                entity.CreatedDate = utcDateTime;
+            }
+
+            entity.UserId = user.UserId;
+            entity.ModifiedBy = $"{user.FirstName} {user.LastName}";
+            entity.ModifiedDate = utcDateTime;
+
+            return entity;
+        }
+
 
         public virtual async Task<TModel> PopulateEntityAsync(
             TModel entity,
@@ -65,6 +85,13 @@ namespace DMIX.API.Handlers
 
         public EntityQuery GetEntityQuery(Filter? filter = null, EntityQuery? query = null)
         {
+
+            if (query?.Query?.FirstOrDefault(x => x.Sort.Equals(nameof(EntityBase<TKey>.RowKey), StringComparison.OrdinalIgnoreCase)) is not null)
+            {
+                return query;
+            }
+
+
             if (filter is not null)
             {
                 return new()
@@ -122,25 +149,62 @@ namespace DMIX.API.Handlers
                 GetRowKeyFilters(entity.RowKey)
                 ];
         }
-
-        public List<Filter> CreateFilters<TModel, TKey>(AppHeader appHeader, string? rowKey = null, EntityQuery? query = null)
-
-            where TModel : EntityBase<TKey>
+        public List<Filter> GetCleanedUpFilters(List<Filter> filters)
         {
-            var user = configurationManagerService.GetEasySMSUser(appHeader.Claims);
+            filters =
+                [
+                 .. filters.Where(filter =>
+                            !string.IsNullOrEmpty(filter.Value) && !string.IsNullOrEmpty(filter.KeyName)
+                        ),
+                    ];
+
+            filters = [.. filters.DistinctBy(x => (x.KeyName, x.Value))];
+
+            return filters;
+        }
+
+        public List<Filter> GetFiltersFromQuery(EntityQuery query, List<Filter> filters)
+        {
+            query ??= GetEntityQuery(query: query);
+            foreach (var q in query.Query)
+            {
+                filters.AddRange([
+                new(){
+                                KeyName = q.Sort,
+                                Value = q.Filter,
+                                IsComparatorSupported = false,
+                                IsKeyQueryable = true,
+                            }
+                ]);
+            }
+
+            return GetCleanedUpFilters(filters);
+        }
+        public List<Filter> CreateFilters(string? rowKey = null, EntityQuery? query = null)
+        {
+            var user = configurationManagerService.GetEasySMSUser(headerHandler.Claims);
             Type type = typeof(TModel);
 
             List<Filter> filters = [];
+            if (query is not null)
+            {
+                var rowKeyQuery = query.Query?.FirstOrDefault(x => !string.IsNullOrEmpty(x.Sort) && x.Sort.Equals(nameof(EntityBase<TKey>.RowKey), StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(rowKeyQuery?.Filter))
+                {
+                    return [GetRowKeyFilters(rowKeyQuery.Filter)];
+                }
+            }
             if (!string.IsNullOrEmpty(rowKey))
             {
-                filters.AddRange([new()
-            {
-                KeyName = nameof(EntityBase<TKey>.RowKey),
-                Value = rowKey,
-                IsComparatorSupported = true,
-                IsKeyQueryable = true,
-            }]);
-
+                filters.AddRange([
+                    new()
+                        {
+                        KeyName = nameof(EntityBase<TKey>.RowKey),
+                        Value = rowKey,
+                        IsComparatorSupported = true,
+                        IsKeyQueryable = true,
+                        }]);
+                return filters;
             }
             Filter filter = new()
             {
@@ -154,21 +218,9 @@ namespace DMIX.API.Handlers
             {
                 case nameof(Account):
                     filters.AddRange([filter]);
-                    return filters;
+                    return GetFiltersFromQuery(query, filters);
                 default:
-                    foreach (var q in query.Query)
-                    {
-                        filters.AddRange([
-                        new(){
-                                KeyName = q.Sort,
-                                Value = q.Filter,
-                                IsComparatorSupported = false,
-                                IsKeyQueryable = true,
-                            }
-                        ]);
-                    }
-
-                    return filters;
+                    return GetFiltersFromQuery(query, filters);
             }
         }
     }

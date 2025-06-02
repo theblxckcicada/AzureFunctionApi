@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace DMIX.API.Models;
 
 
@@ -30,9 +32,10 @@ public class EntityQuery
 
 public static class EntityKey
 {
-    public static TKey ParseId<TKey>(string id)
+    public static TKey ParseId<TKey>(string value)
     {
-        return (TKey)Convert.ChangeType(id, typeof(TKey));
+        var converter = TypeDescriptor.GetConverter(typeof(TKey));
+        return (TKey)converter.ConvertFromInvariantString(value)!;
     }
 }
 

@@ -1,5 +1,3 @@
-using FluentValidation.Results;
-
 namespace DMIX.API.Models;
 
 public record CommandResponse<TModel>
